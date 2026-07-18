@@ -12,8 +12,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  // SSL required for Railway/PlanetScale/Aiven hosted MySQL
-  ...(isProduction && {
+  // SSL required for TiDB Serverless, Railway, or production MySQL hosting
+  ...( (isProduction || parseInt(process.env.DB_PORT) === 4000) && {
     ssl: { rejectUnauthorized: false }
   })
 });
