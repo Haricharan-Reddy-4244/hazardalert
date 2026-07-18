@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="India's first AI-powered civic accountability engine. Report road hazards, track government response, file RTI applications, and create public pressure for faster fixes.">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HazardAlert">
+    <link rel="manifest" href="manifest.json">
+    <title>HazardAlert — AI Civic Accountability Engine | Road Safety Reporting</title>
+
+    <!-- Google Fonts — Inter for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- LEAFLET CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Socket.io client — real-time proximity alerts -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- TensorFlow.js for AI Camera Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23dc2626'/%3E%3Ctext y='.9em' font-size='80' x='10'%3E🚨%3C/text%3E%3C/svg%3E">
+</head>
+
+<body>
+    <!-- Demo Credentials Bar (auto-dismisses after 15s) -->
+    <div id="demo-info-bar" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;text-align:center;padding:6px 16px;font-size:12px;font-weight:700;letter-spacing:0.3px;position:relative;z-index:10000;display:flex;align-items:center;justify-content:center;gap:16px;">
+      <span>🏆 DEMO MODE — Login: <strong>demo@hazardalert.com</strong> &nbsp;|&nbsp; Password: <strong>demo1234</strong> &nbsp;|&nbsp; Tier: 💎 Champion</span>
+      <button onclick="document.getElementById('demo-info-bar').remove()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:6px;padding:2px 10px;cursor:pointer;font-weight:700;">✕</button>
+    </div>
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="pwa-banner hidden">
+        <div class="pwa-banner-content">
+            <div class="flex items-center gap-8">
+                <div class="pwa-icon">⚠️</div>
+                <div class="flex-1">
+                    <div class="font-weight-medium">Install HazardAlert</div>
+                    <div class="text-secondary">Get instant access to report hazards offline</div>
+                </div>
+            </div>
+            <div class="flex gap-8">
+                <button id="pwa-install-btn" class="btn btn--primary btn--sm">Install</button>
+                <button id="pwa-dismiss-btn" class="btn btn--outline btn--sm">Later</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proximity Alert Banner (shown when nearby hazards need verification) -->
+    <div id="proximity-alert-banner" class="proximity-alert-banner hidden" role="alert" aria-live="polite">
+        <div class="proximity-alert-inner">
+            <div class="proximity-alert-icon">📍</div>
+            <div class="proximity-alert-body">
+                <p class="proximity-alert-title" id="proximity-alert-title">New hazard reported nearby!</p>
+                <p class="proximity-alert-desc" id="proximity-alert-desc">Help verify this hazard to keep your community
+                    safe.</p>
+                <div class="proximity-alert-meta" id="proximity-alert-meta"></div>
+            </div>
+            <div class="proximity-alert-actions">
+                <button class="btn-witness btn-confirm" id="proximity-confirm-btn">✅ Confirm</button>
+                <button class="btn-witness btn-dispute" id="proximity-dispute-btn">❌ Dispute</button>
+                <button class="proximity-alert-view" id="proximity-view-btn">View →</button>
+            </div>
+            <button class="proximity-alert-close" id="proximity-alert-close" aria-label="Dismiss">✕</button>
+        </div>
+        <div class="proximity-alert-progress" id="proximity-alert-progress"></div>
+    </div>
+
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">Sign In</h3>
+                <button class="modal-close" id="auth-modal-close">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="login-email" placeholder="Enter your email"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" id="login-password"
+                            placeholder="Enter your password" required>
+                    </div>
+                    <button class="btn btn--primary btn--full-width" id="login-submit">Sign In</button>
+                    <p class="auth-switch">Don't have an account? <button class="btn-link" id="show-register">Sign
+                            up</button></p>
+                </div>
+
+                <div id="register-form" class="auth-form hidden">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" id="register-username" placeholder="Choose a username"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="register-email" placeholder="Enter your email"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" id="register-password"
+                            placeholder="Create a password" required>
+                    </div>
+                    <button class="btn btn--primary btn--full-width" id="register-submit">Sign Up</button>
+                    <p class="auth-switch">Already have an account? <button class="btn-link" id="show-login">Sign
+                            in</button></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-content">
+            <div class="flex items-center gap-16">
+                <div class="logo">
+                    <h1 class="logo-text">⚠️ HazardAlert</h1>
+                </div>
+                <button id="hamburger-btn" class="hamburger-btn">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+
+            <!-- Desktop Navigation -->
+            <nav class="desktop-nav">
+                <button class="nav-btn active" data-view="map">🗺️ Map</button>
+                <button class="nav-btn" data-view="list">📋 List</button>
+                <button class="nav-btn" data-view="admin">📊 Dashboard</button>
+
+
+
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <input type="text" id="global-search" class="search-input" placeholder="Search hazards...">
+                    <button class="search-btn">🔍</button>
+                </div>
+
+                <!-- User Menu -->
+                <div class="user-menu" id="user-menu">
+                    <button id="header-login-btn" class="btn btn--outline btn--sm" style="margin-right: 12px; display: none; height: 32px; padding: 0 16px; border-color: rgba(255,255,255,0.2); color: #f1f5f9;" onclick="document.getElementById('auth-modal').classList.remove('hidden')">Sign In</button>
+                    <div class="notification-bell" id="notification-bell">
+                        🔔 <span class="notification-count" id="notification-count">0</span>
+                    </div>
+                    <div class="user-avatar" id="user-avatar" title="Open menu">👤</div>
+                    <div class="user-dropdown hidden" id="user-dropdown" onclick="event.stopPropagation()">
+                        <div class="dropdown-header" id="dropdown-username">MY ACCOUNT</div>
+                        <div class="dropdown-item" id="profile-link">
+                            <span class="dropdown-icon" style="color: #432c7a;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg></span> View Profile
+                        </div>
+                        <div class="dropdown-item" id="settings-link">
+                            <span class="dropdown-icon" style="color: #a79bbd;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></span> Settings
+                        </div>
+                        <div class="dropdown-separator"></div>
+                        <div class="dropdown-item" id="logout-link">
+                            <span class="dropdown-icon" style="color: #d18a61;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg></span> Logout
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation Menu -->
+    <nav id="mobile-menu" class="mobile-menu hidden">
+        <div class="mobile-nav-header">
+            <div class="mobile-user-info">
+                <div class="mobile-avatar">👤</div>
+                <div class="mobile-user-details">
+                    <div class="mobile-username" id="mobile-username">Guest User</div>
+                    <div class="mobile-user-status">Trust Score: <span id="mobile-trust-score">85</span></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="nav-btn mobile-nav-btn active" data-view="map">📍 Map View</button>
+        <button class="nav-btn mobile-nav-btn" data-view="list">📋 List View</button>
+        <button class="nav-btn mobile-nav-btn" data-view="admin">📊 Dashboard</button>
+        <div class="nav-separator"></div>
+        <button class="nav-btn mobile-nav-btn" id="mobile-profile-btn">👤 My Profile</button>
+        <button class="nav-btn mobile-nav-btn" id="mobile-settings-btn">⚙️ Settings</button>
+        <button class="nav-btn mobile-nav-btn" id="mobile-logout-btn">🚪 Sign Out</button>
+
+        <div class="mobile-menu-footer">
+            <div class="connection-status">
+                <span class="status-dot" id="connection-status"></span>
+                <span id="connection-text">Connecting...</span>
+            </div>
+            <div class="app-version">v2.1.0</div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Map View -->
+        <div id="map-view" class="view active">
+            <div class="view-header">
+                <div class="view-title-section">
+                    <h2>🌍 Live Hazard Map</h2>
+                    <div class="real-time-indicator">
+                        <span class="pulse-dot"></span>
+                        <span>Live Updates</span>
+                    </div>
+                </div>
+
+                <div class="map-controls">
+                    <div class="filter-controls">
+                        <select id="type-filter" class="form-control">
+                            <option value="">All Types</option>
+                            <option value="Pothole">🕳️ Pothole</option>
+                            <option value="Accident">🚗 Accident</option>
+                            <option value="Fallen Tree">🌳 Fallen Tree</option>
+                            <option value="Waterlogging">🌊 Waterlogging</option>
+                            <option value="Road Closure">🚧 Road Closure</option>
+                            <option value="Stalled Vehicle">🚙 Stalled Vehicle</option>
+                            <option value="Broken Guardrail">🛡️ Broken Guardrail</option>
+                            <option value="Other">⚠️ Other</option>
+                        </select>
+                        <select id="severity-filter" class="form-control">
+                            <option value="">All Severities</option>
+                            <option value="Low">🟢 Low</option>
+                            <option value="Medium">🟡 Medium</option>
+                            <option value="High">🟠 High</option>
+                            <option value="Critical">🔴 Critical</option>
+                        </select>
+                        <button class="btn btn--outline btn--sm" id="refresh-map">🔄 Refresh</button>
+                        <button class="btn btn--ai btn--sm" id="ai-scan-btn" title="AI Camera Hazard Detection">🤖 AI
+                            Scan</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hero Stats Strip -->
+            <div class="map-hero-stats">
+                <div class="hero-stat">
+                    <span class="hero-stat-icon">📍</span>
+                    <div class="hero-stat-info">
+                        <span class="hero-stat-num" id="map-total-hazards">0</span>
+                        <span class="hero-stat-label">Total Hazards</span>
+                    </div>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-icon">🔴</span>
+                    <div class="hero-stat-info">
+                        <span class="hero-stat-num hero-critical" id="map-critical-count">0</span>
+                        <span class="hero-stat-label">Critical</span>
+                    </div>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-icon">🌡️</span>
+                    <div class="hero-stat-info">
+                        <span class="hero-stat-num hero-risk" id="map-high-risk-count">0</span>
+                        <span class="hero-stat-label">High Risk Zones</span>
+                    </div>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-icon">✅</span>
+                    <div class="hero-stat-info">
+                        <span class="hero-stat-num hero-verified" id="map-verified-count">0</span>
+                        <span class="hero-stat-label">Verified</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <!-- Map Layer Toggles -->
+                <div class="map-layer-controls">
+                    <span class="layer-ctrl-label">Layers:</span>
+                    <label class="layer-toggle">
+                        <input type="checkbox" id="toggle-markers" checked> 📍 Markers
+                    </label>
+                    <label class="layer-toggle">
+                        <input type="checkbox" id="toggle-danger-zones" checked> 🔴 Danger Zones
+                    </label>
+                    <label class="layer-toggle">
+                        <input type="checkbox" id="toggle-heatmap" checked> 🌡️ Risk Heatmap
+                    </label>
+                </div>
+
+                <!-- Map with floating legend -->
+                <div class="map-wrapper">
+                    <div id="map" style="height: 600px; width: 100%; border-radius: var(--radius-lg);"></div>
+                    <div class="map-legend-float">
+                        <h4 class="legend-title">🗺️ Legend</h4>
+                        <div class="legend-section-title">Severity</div>
+                        <div class="legend-item">
+                            <div class="marker marker-critical"></div>Critical
+                        </div>
+                        <div class="legend-item">
+                            <div class="marker marker-high"></div>High
+                        </div>
+                        <div class="legend-item">
+                            <div class="marker marker-medium"></div>Medium
+                        </div>
+                        <div class="legend-item">
+                            <div class="marker marker-low"></div>Low
+                        </div>
+                        <div class="legend-section-title">Risk Heatmap</div>
+                        <div class="legend-item">
+                            <div class="heat-dot heat-high"></div>High Risk
+                        </div>
+                        <div class="legend-item">
+                            <div class="heat-dot heat-medium"></div>Medium
+                        </div>
+                        <div class="legend-item">
+                            <div class="heat-dot heat-safe"></div>Safe
+                        </div>
+                        <div class="legend-section-title">Danger Radius</div>
+                        <div class="legend-item legend-item--small">🚗 Accident = 200m</div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- END map-view -->
+
+
+        <!-- List View -->
+        <div id="list-view" class="view">
+            <div class="view-header">
+                <div class="view-title-section">
+                    <h2>📋 Hazard Reports</h2>
+                    <div class="results-count">
+                        Showing <span id="results-count">0</span> results
+                    </div>
+                </div>
+
+                <div class="list-controls">
+                    <div class="view-toggle">
+                        <button class="btn btn--outline btn--sm" id="grid-toggle">⊞ Grid</button>
+                        <button class="btn btn--secondary btn--sm active" id="list-toggle">☰ List</button>
+                    </div>
+                    <div class="sort-controls">
+                        <select id="sort-select" class="form-control">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="severity">By Severity</option>
+                            <option value="upvotes">Most Upvoted</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="list-filters">
+                <div class="filter-row">
+                    <input type="text" id="location-search" class="form-control" placeholder="🔍 Search by location...">
+                    <select id="status-filter" class="form-control">
+                        <option value="">All Status</option>
+                        <option value="Pending">⏳ Pending</option>
+                        <option value="Verified">✅ Verified</option>
+                        <option value="Disputed">❌ Disputed</option>
+                        <option value="Resolved">🏁 Resolved</option>
+                    </select>
+                    <button class="btn btn--outline btn--sm" id="clear-filters">Clear All</button>
+                </div>
+            </div>
+
+            <div id="hazard-list" class="hazard-list">
+                <!-- Hazard cards will be dynamically generated here -->
+            </div>
+
+            <div class="pagination" id="pagination">
+                <button class="btn btn--outline btn--sm" id="prev-page" disabled>← Previous</button>
+                <span id="page-info" class="page-info">Page 1 of 1</span>
+                <button class="btn btn--outline btn--sm" id="next-page">Next →</button>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard View -->
+        <div id="admin-view" class="view">
+            <!-- Admin Header Bar -->
+            <div class="admin-header-bar">
+                <div class="admin-title-block">
+                    <div class="admin-shield-icon">🛡️</div>
+                    <div>
+                        <h2 class="admin-title">Admin Dashboard</h2>
+                        <div class="admin-subtitle">HazardAlert Control Center</div>
+                    </div>
+                </div>
+                <div class="admin-header-actions">
+                    <div class="admin-timestamp">
+                        <span class="pulse-dot"></span>
+                        Live · Updated <span id="dashboard-updated">just now</span>
+                    </div>
+                    <button class="admin-btn admin-btn--secondary" id="refresh-stats">
+                        <span>🔄</span> Refresh
+                    </button>
+                    <button class="admin-btn admin-btn--primary" id="export-csv">
+                        <span>📥</span> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistics Cards Row -->
+            <div class="admin-stats-grid">
+                <div class="admin-stat-card admin-stat-card--blue">
+                    <div class="stat-card-icon">📊</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="total-reports">0</div>
+                        <div class="stat-card-label">Total Reports</div>
+                        <div class="stat-card-sub">All time</div>
+                    </div>
+                    <div class="stat-card-trend up">↑ Live</div>
+                </div>
+                <div class="admin-stat-card admin-stat-card--green">
+                    <div class="stat-card-icon">✅</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="verified-reports">0</div>
+                        <div class="stat-card-label">Verified</div>
+                        <div class="stat-card-sub">Community confirmed</div>
+                    </div>
+                    <div class="stat-card-trend up">✔ Safe</div>
+                </div>
+                <div class="admin-stat-card admin-stat-card--amber">
+                    <div class="stat-card-icon">⏳</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="pending-reports">0</div>
+                        <div class="stat-card-label">Pending Review</div>
+                        <div class="stat-card-sub">Awaiting action</div>
+                    </div>
+                    <div class="stat-card-trend warn">! Review</div>
+                </div>
+                <div class="admin-stat-card admin-stat-card--red">
+                    <div class="stat-card-icon">🚩</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="critical-reports">0</div>
+                        <div class="stat-card-label">Disputed</div>
+                        <div class="stat-card-sub">Flagged for review</div>
+                    </div>
+                    <div class="stat-card-trend down">⚠ Alert</div>
+                </div>
+                <div class="admin-stat-card admin-stat-card--purple">
+                    <div class="stat-card-icon">👥</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="total-users">—</div>
+                        <div class="stat-card-label">Total Users</div>
+                        <div class="stat-card-sub">Registered accounts</div>
+                    </div>
+                    <div class="stat-card-trend up">↑ Growing</div>
+                </div>
+                <div class="admin-stat-card admin-stat-card--teal">
+                    <div class="stat-card-icon">🟢</div>
+                    <div class="stat-card-body">
+                        <div class="stat-card-value" id="active-users">—</div>
+                        <div class="stat-card-label">Active Reporters</div>
+                        <div class="stat-card-sub">Submitted ≥1 report</div>
+                    </div>
+                    <div class="stat-card-trend up">↑ Active</div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="admin-charts">
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <h3>📈 Reports by Type</h3>
+                    </div>
+                    <canvas id="type-chart" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <h3>📅 Weekly Activity</h3>
+                    </div>
+                    <canvas id="activity-chart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Hazard Management Table -->
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <div class="panel-title-group">
+                        <h3>⚠️ Recent Hazard Reports</h3>
+                        <span class="panel-badge" id="admin-table-count">0 reports</span>
+                    </div>
+                    <div class="panel-actions">
+                        <select class="admin-select" id="admin-type-filter">
+                            <option value="">All Types</option>
+                            <option value="Pothole">🕳️ Pothole</option>
+                            <option value="Accident">🚗 Accident</option>
+                            <option value="Road Closure">🚧 Road Closure</option>
+                            <option value="Stalled Vehicle">🚙 Stalled Vehicle</option>
+                            <option value="Broken Guardrail">🛡️ Guardrail</option>
+                            <option value="Other">⚠️ Other</option>
+                        </select>
+                        <select class="admin-select" id="admin-status-filter">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="verified">Verified</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="disputed">Disputed</option>
+                        </select>
+                        <select class="admin-select" id="admin-severity-filter">
+                            <option value="">All Severity</option>
+                            <option value="critical">🔴 Critical</option>
+                            <option value="high">🟠 High</option>
+                            <option value="medium">🟡 Medium</option>
+                            <option value="low">🟢 Low</option>
+                        </select>
+                        <button class="admin-btn admin-btn--ghost" id="bulk-approve" title="Verify selected">✅ Bulk
+                            Verify</button>
+                        <button class="admin-btn admin-btn--ghost" id="auto-verify" title="Auto-verify by rules">🤖
+                            Auto-Verify</button>
+                    </div>
+                </div>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table" id="admin-reports-table">
+                        <thead>
+                            <tr>
+                                <th class="col-check"><input type="checkbox" id="select-all-reports" title="Select all">
+                                </th>
+                                <th>Hazard</th>
+                                <th>Location</th>
+                                <th>Reporter</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Votes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-reports-tbody">
+                            <tr>
+                                <td colspan="8" class="table-empty">Loading reports...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- User Management Panel -->
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <div class="panel-title-group">
+                        <h3>👥 User Management</h3>
+                        <div class="user-header-stats">
+                            <span class="user-stat-pill">Total: <strong id="total-users-badge">—</strong></span>
+                            <span class="user-stat-pill online">Active: <strong
+                                    id="active-users-badge">—</strong></span>
+                        </div>
+                    </div>
+                    <div class="panel-actions">
+                        <input type="text" class="admin-search-input" id="user-search" placeholder="🔍 Search users...">
+                    </div>
+                </div>
+                <div id="user-management" class="user-grid">
+                    <div class="user-grid-loading">Loading users...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile View -->
+        <div id="profile-view" class="view">
+            <div class="view-header">
+                <h2>👤 My Profile</h2>
+                <button class="btn btn--outline btn--sm" id="edit-profile">✏️ Edit Profile</button>
+            </div>
+
+            <div class="profile-content">
+                <div class="profile-hero">
+                    <div class="profile-avatar-large">
+                        <div class="avatar-circle" id="profile-avatar-large">👤</div>
+                        <button class="avatar-upload-btn" id="upload-avatar">📷</button>
+                    </div>
+                    <div class="profile-info">
+                        <h3 id="profile-name">Loading...</h3>
+                        <div class="profile-title" id="profile-title">Community Reporter</div>
+                        <div class="trust-score-container">
+                            <div class="trust-label">Trust Score</div>
+                            <div class="trust-score-visual">
+                                <div class="trust-score-bar">
+                                    <div class="trust-score-fill" id="trust-score-fill"></div>
+                                </div>
+                                <span class="trust-score-number" id="trust-score">85</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-stats-grid">
+                    <div class="profile-stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Reports Submitted</div>
+                            <div class="stat-value" id="reports-submitted">0</div>
+                            <div class="stat-trend">↗ +2 this week</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-stat-card">
+                        <div class="stat-icon">👍</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Upvotes Received</div>
+                            <div class="stat-value" id="upvotes-received">0</div>
+                            <div class="stat-trend">↗ +8 this week</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Accuracy Rate</div>
+                            <div class="stat-value" id="accuracy-rate">92%</div>
+                            <div class="stat-trend">↗ +3% this month</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Response Time</div>
+                            <div class="stat-value" id="response-time">8m</div>
+                            <div class="stat-trend">↗ 2m faster</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-sections">
+                    <div class="profile-section">
+                        <h4>🏆 Achievements</h4>
+                        <div class="badges" id="badges-list">
+                            <!-- Badges will be generated here -->
+                        </div>
+                    </div>
+
+                    <div class="profile-section">
+                        <h4>📈 Activity Timeline</h4>
+                        <div class="activity-timeline" id="activity-timeline">
+                            <!-- Activity items will be generated here -->
+                        </div>
+                    </div>
+
+                    <div class="profile-section">
+                        <h4>📊 Impact Summary</h4>
+                        <div class="impact-grid">
+                            <div class="impact-item">
+                                <span class="impact-number">23</span>
+                                <span class="impact-label">Hazards Resolved</span>
+                            </div>
+                            <div class="impact-item">
+                                <span class="impact-number">156</span>
+                                <span class="impact-label">People Helped</span>
+                            </div>
+                            <div class="impact-item">
+                                <span class="impact-number">4.2</span>
+                                <span class="impact-label">Community Rating</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Action Buttons -->
+    <div class="fab-group">
+        <button id="fab-ai-scan" class="fab fab--ai" title="AI Camera Hazard Detection">
+            <span class="fab-icon">🤖</span>
+            <span class="fab-text">AI Scan</span>
+        </button>
+        <button id="fab-report" class="fab">
+            <span class="fab-icon">📍</span>
+            <span class="fab-text">Report Hazard</span>
+        </button>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav class="bottom-nav">
+        <button class="bottom-nav-btn active" data-view="map">
+            <span class="nav-icon">📍</span>
+            <span>Map</span>
+        </button>
+        <button class="bottom-nav-btn" data-view="list">
+            <span class="nav-icon">📋</span>
+            <span>List</span>
+        </button>
+        <button class="bottom-nav-btn" data-view="admin">
+            <span class="nav-icon">📊</span>
+            <span>Dashboard</span>
+        </button>
+        <button class="bottom-nav-btn" id="profile-nav-btn">
+            <span class="nav-icon">👤</span>
+            <span>Profile</span>
+        </button>
+    </nav>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 440px; background: linear-gradient(170deg, #0d1117 0%, #161b22 40%, #0d1117 100%); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 24px 80px rgba(0,0,0,0.6); color: #f1f5f9; border-radius: 16px;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding: 20px;">
+                <h3 style="color: #f1f5f9; display: flex; align-items: center; gap: 8px; margin: 0; font-size: 18px;">
+                    <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(168,85,247,0.1); color: #a855f7; border-radius: 8px; border: 1px solid rgba(168,85,247,0.2);">⚙️</span>
+                    Account Settings
+                </h3>
+                <button class="modal-close" id="settings-modal-close" style="color: #94a3b8; background: rgba(255,255,255,0.05); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px 20px;">
+                
+                <div style="margin-bottom: 24px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px;">
+                    <label style="display: block; font-size: 11px; font-weight: 800; color: #a855f7; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">System Preferences</label>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                        <span style="font-size: 14px; color: #e2e8f0; font-weight: 500;">Email Alerts</span>
+                        <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #a855f7; border-radius: 24px; transition: .4s;">
+                                <span style="position: absolute; height: 18px; width: 18px; left: 22px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+                            </span>
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; color: #e2e8f0; font-weight: 500;">Push Notifications</span>
+                        <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #a855f7; border-radius: 24px; transition: .4s;">
+                                <span style="position: absolute; height: 18px; width: 18px; left: 22px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 24px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px;">
+                    <label style="display: block; font-size: 11px; font-weight: 800; color: #a855f7; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">Regional</label>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; color: #e2e8f0; font-weight: 500;">Language</span>
+                        <select style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #f1f5f9; padding: 6px 12px; border-radius: 6px; font-size: 13px; outline: none; cursor: pointer;">
+                            <option>English</option>
+                            <option>Hindi</option>
+                            <option>Telugu</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn btn--primary btn--full-width" style="background: linear-gradient(135deg, #a855f7, #7e22ce); border: none; padding: 12px; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; border-radius: 10px; box-shadow: 0 8px 20px rgba(168,85,247,0.25);" onclick="document.getElementById('settings-modal').classList.add('hidden'); UI.showToast('Settings saved successfully', 'success')">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="report-modal" class="modal hidden">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>📍 Report New Hazard</h3>
+                <button class="modal-close" id="report-modal-close">&times;</button>
+            </div>
+
+            <form id="report-form" class="modal-body">
+                <!-- Honeypot: invisible to humans, bots fill it = instant reject -->
+                <input type="text" name="website" id="hp-website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" aria-hidden="true">
+                <div class="form-steps">
+                    <div class="step active" data-step="1">
+                        <div class="step-number">1</div>
+                        <span>Location</span>
+                    </div>
+                    <div class="step" data-step="2">
+                        <div class="step-number">2</div>
+                        <span>Details</span>
+                    </div>
+                    <div class="step" data-step="3">
+                        <div class="step-number">3</div>
+                        <span>Evidence</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Location -->
+                <div class="form-step active" id="step-1">
+                    <h4>📍 Where is the hazard located?</h4>
+
+                    <div class="form-group">
+                        <label class="form-label">Current Location</label>
+                        <div class="location-input-container">
+                            <input type="text" class="form-control" id="report-location"
+                                placeholder="Getting your location..." readonly>
+                            <button type="button" class="btn btn--outline btn--sm" id="use-current-location">
+                                📍 Use Current
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Or Enter Address Manually</label>
+                        <input type="text" class="form-control" id="manual-location"
+                            placeholder="Enter street address or intersection">
+                    </div>
+
+                    <div class="location-preview" id="location-preview" style="margin-top: 16px;">
+                        <iframe id="map-preview-iframe" width="100%" height="250" frameborder="0"
+                            style="border:0; border-radius: 8px; display: none;" src="" allowfullscreen></iframe>
+                        <div id="map-preview-placeholder" class="location-map-preview"
+                            style="height: 250px; background: #f5f5f5; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #666; border: 1px dashed #ccc;">
+                            📍 Location preview will appear here
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Details -->
+                <div class="form-step" id="step-2">
+                    <h4>⚠️ What type of hazard is it?</h4>
+
+                    <div class="form-group">
+                        <label class="form-label">Hazard Type</label>
+                        <div class="hazard-type-grid">
+                            <div class="hazard-type-option" data-type="Pothole">
+                                <div class="hazard-icon">🕳️</div>
+                                <div class="hazard-label">Pothole</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Accident">
+                                <div class="hazard-icon">🚗</div>
+                                <div class="hazard-label">Accident</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Fallen Tree">
+                                <div class="hazard-icon">🌳</div>
+                                <div class="hazard-label">Fallen Tree</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Waterlogging">
+                                <div class="hazard-icon">🌊</div>
+                                <div class="hazard-label">Waterlogging</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Road Closure">
+                                <div class="hazard-icon">🚧</div>
+                                <div class="hazard-label">Road Closure</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Stalled Vehicle">
+                                <div class="hazard-icon">🚙</div>
+                                <div class="hazard-label">Stalled Vehicle</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Broken Guardrail">
+                                <div class="hazard-icon">🛡️</div>
+                                <div class="hazard-label">Broken Guardrail</div>
+                            </div>
+                            <div class="hazard-type-option" data-type="Other">
+                                <div class="hazard-icon">⚠️</div>
+                                <div class="hazard-label">Other</div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="report-type" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Severity Level</label>
+                        <div class="severity-grid">
+                            <div class="severity-option" data-severity="Low">
+                                <div class="severity-indicator low"></div>
+                                <div>
+                                    <div class="severity-label">Low</div>
+                                    <div class="severity-description">Minor inconvenience</div>
+                                </div>
+                            </div>
+                            <div class="severity-option" data-severity="Medium">
+                                <div class="severity-indicator medium"></div>
+                                <div>
+                                    <div class="severity-label">Medium</div>
+                                    <div class="severity-description">Causes delays</div>
+                                </div>
+                            </div>
+                            <div class="severity-option" data-severity="High">
+                                <div class="severity-indicator high"></div>
+                                <div>
+                                    <div class="severity-label">High</div>
+                                    <div class="severity-description">Safety concern</div>
+                                </div>
+                            </div>
+                            <div class="severity-option" data-severity="Critical">
+                                <div class="severity-indicator critical"></div>
+                                <div>
+                                    <div class="severity-label">Critical</div>
+                                    <div class="severity-description">Immediate danger</div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="report-severity" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <!-- Voice Reporting Button (Feature 2) -->
+                        <button type="button" id="voice-report-btn" class="voice-btn" title="Hands-free voice reporting — speak your hazard description" onclick="IntelligenceEngine && IntelligenceEngine._toggleVoice(document.getElementById('report-description'), this)">🎙️ Voice Report</button>
+                        <textarea class="form-control" id="report-description"
+                            placeholder="Provide details about the hazard..." rows="4"></textarea>
+                        <div class="form-help">Be specific to help others understand the situation</div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Evidence -->
+                <div class="form-step" id="step-3">
+                    <h4>📸 Add Evidence (Optional)</h4>
+
+                    <div class="form-group">
+                        <label class="form-label">Photo Evidence</label>
+                        <div class="photo-upload-container">
+                            <input type="file" class="form-control" id="report-photo" accept="image/*" multiple onchange="IntelligenceEngine && IntelligenceEngine._runGeminiAnalysis(this)">
+                            <div class="upload-preview" id="upload-preview">
+                                <div class="upload-placeholder">
+                                    <div class="upload-icon">📷</div>
+                                    <div>Upload photos to verify the hazard</div>
+                                    <div class="upload-tip">Up to 3 photos, max 5MB each</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Gemini AI Analysis Button (Feature 1) -->
+                        <button type="button" id="gemini-analyze-btn" class="gemini-btn" onclick="IntelligenceEngine && IntelligenceEngine._runGeminiAnalysis(document.getElementById('report-photo'))" title="AI will auto-detect hazard type, severity and description from your photo">🤖 AI Auto-Analyze Photo</button>
+                        <div id="gemini-result"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="anonymous-report">
+                            <label for="anonymous-report">Submit anonymously</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="urgent-report">
+                            <label for="urgent-report">Mark as urgent (requires immediate attention)</label>
+                        </div>
+                    </div>
+
+                    <div class="report-summary">
+                        <h5>Review Your Report</h5>
+                        <div class="summary-content" id="report-summary">
+                            <!-- Summary will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn--outline" id="prev-step" disabled>← Previous</button>
+                <button type="button" class="btn btn--outline" id="cancel-report">Cancel</button>
+                <button type="button" class="btn btn--primary" id="next-step">Next →</button>
+                <button type="submit" form="report-form" class="btn btn--primary hidden" id="submit-report">
+                    📤 Submit Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hazard Detail Modal -->
+    <div id="hazard-modal" class="modal hidden">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3 id="hazard-modal-title">Hazard Details</h3>
+                <button class="modal-close" id="hazard-modal-close">&times;</button>
+            </div>
+
+            <div class="modal-body" id="hazard-modal-body">
+                <!-- Hazard details will be populated here -->
+            </div>
+
+            <!-- Witness Verification Panel -->
+            <div id="verification-panel" class="verification-panel hidden">
+                <div class="verification-header">
+                    <span class="verification-icon">🧑‍⚖️</span>
+                    <div>
+                        <div class="verification-title">Proximity Witness Verification</div>
+                        <div class="verification-subtitle">You are near this hazard. Can you verify it?</div>
+                    </div>
+                </div>
+                <div class="trust-score-display">
+                    <div class="ts-label">Community Trust Score</div>
+                    <div class="ts-bar-track">
+                        <div class="ts-bar-fill" id="modal-trust-fill"></div>
+                    </div>
+                    <div class="ts-value" id="modal-trust-value">–</div>
+                </div>
+                <div class="verification-actions">
+                    <button class="btn btn--verify" id="verify-confirm-btn">✅ Confirm Hazard</button>
+                    <button class="btn btn--reject" id="verify-reject-btn">❌ False Report</button>
+                </div>
+                <div class="proof-upload-section">
+                    <label class="proof-label">📷 Upload Photo Proof (boosts trust score +4)</label>
+                    <input type="file" id="verify-photo" accept="image/*" class="proof-file-input">
+                    <label class="proof-label" style="margin-top:8px;">🎥 Upload Video Proof (boosts trust score
+                        +5)</label>
+                    <input type="file" id="verify-video" accept="video/*" class="proof-file-input">
+                </div>
+                <div class="verification-stats" id="verification-stats"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn--outline" id="share-hazard">🔗 Share</button>
+                <button class="btn btn--secondary" id="get-directions">🧭 Directions</button>
+                <button class="btn btn--outline" id="hazard-modal-close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Camera Detection Modal -->
+    <div id="ai-camera-modal" class="modal hidden">
+        <div class="modal-content ai-camera-modal-content">
+            <div class="modal-header ai-header">
+                <div class="ai-header-title">
+                    <span class="ai-pulse-dot"></span>
+                    <h3>🤖 AI Hazard Scanner</h3>
+                </div>
+                <button class="modal-close" id="ai-camera-close">&times;</button>
+            </div>
+
+            <!-- Mode Tabs -->
+            <div class="ai-mode-tabs">
+                <button class="ai-mode-tab active" id="tab-upload" data-mode="upload">
+                    📷 Photo Upload
+                </button>
+                <button class="ai-mode-tab" id="tab-camera" data-mode="camera">
+                    📹 Live Camera
+                </button>
+            </div>
+
+            <div class="modal-body ai-camera-body">
+
+                <!-- ── UPLOAD MODE ── -->
+                <div id="ai-mode-upload">
+                    <!-- Upload Zone (shown before photo) -->
+                    <div id="ai-upload-zone" class="ai-upload-zone">
+                        <div class="ai-upload-icon">📷</div>
+                        <div class="ai-upload-title">Drop a hazard photo here</div>
+                        <div class="ai-upload-sub">or click to browse from your device</div>
+                        <input type="file" id="ai-photo-input" accept="image/*" style="display:none">
+                        <button class="btn btn--primary ai-upload-btn" id="ai-browse-btn">📂 Choose Photo</button>
+                        <div class="ai-upload-hint">Supports JPG, PNG, WEBP — Max 10MB</div>
+                    </div>
+
+                    <!-- Preview + Scan Area (shown after photo is picked) -->
+                    <div id="ai-scan-area" class="ai-scan-area hidden">
+                        <div class="camera-viewport">
+                            <img id="ai-preview-img" class="ai-preview-img" src="" alt="Hazard photo preview">
+                            <canvas id="ai-detection-canvas"></canvas>
+                            <div class="camera-overlay-ui">
+                                <div class="scan-line" id="ai-scan-line"></div>
+                                <div class="corner tl"></div>
+                                <div class="corner tr"></div>
+                                <div class="corner bl"></div>
+                                <div class="corner br"></div>
+                            </div>
+                            <div id="ai-detection-badge" class="detection-badge hidden"></div>
+                        </div>
+                        <div class="ai-status-bar">
+                            <div id="ai-status-text" class="ai-status">⏳ Analyzing with Gemini AI...</div>
+                            <div id="ai-confidence-display" class="confidence-display hidden">
+                                <span id="ai-detected-label">–</span>
+                                <div class="confidence-bar-track">
+                                    <div class="confidence-bar-fill" id="ai-confidence-bar"></div>
+                                </div>
+                                <span id="ai-confidence-pct">0%</span>
+                            </div>
+                        </div>
+                        <!-- Gemini result card -->
+                        <div id="ai-result-card" class="ai-result-card hidden">
+                            <div class="ai-result-row">
+                                <span class="ai-result-label">🚨 Hazard Type</span>
+                                <span class="ai-result-value" id="ai-result-type">—</span>
+                            </div>
+                            <div class="ai-result-row">
+                                <span class="ai-result-label">⚡ Severity</span>
+                                <span class="ai-result-value" id="ai-result-severity">—</span>
+                            </div>
+                            <div class="ai-result-row">
+                                <span class="ai-result-label">📋 Suggested Action</span>
+                                <span class="ai-result-value ai-result-action" id="ai-result-action">—</span>
+                            </div>
+                            <div class="ai-result-row" id="ai-result-area-row">
+                                <span class="ai-result-label">📏 Area Affected</span>
+                                <span class="ai-result-value" id="ai-result-area">—</span>
+                            </div>
+                            <div class="ai-result-desc" id="ai-result-desc">—</div>
+                        </div>
+                        <!-- Rejected state -->
+                        <div id="ai-rejected-card" class="ai-rejected-card hidden">
+                            <div class="ai-rejected-icon">🚫</div>
+                            <div class="ai-rejected-title">No Hazard Detected</div>
+                            <div class="ai-rejected-msg" id="ai-rejected-msg">Please upload a clear photo of a road hazard.</div>
+                            <button class="btn btn--outline" id="ai-retry-btn">🔄 Try Another Photo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── CAMERA MODE ── -->
+                <div id="ai-mode-camera" class="hidden">
+                    <div class="camera-viewport">
+                        <video id="ai-camera-feed" autoplay playsinline muted class="ai-camera-video"></video>
+                        <canvas id="ai-camera-canvas"></canvas>
+                        <div class="camera-overlay-ui">
+                            <div class="scan-line"></div>
+                            <div class="corner tl"></div>
+                            <div class="corner tr"></div>
+                            <div class="corner bl"></div>
+                            <div class="corner br"></div>
+                        </div>
+                        <div id="ai-camera-badge" class="detection-badge hidden"></div>
+                    </div>
+                    <div class="ai-status-bar">
+                        <div id="ai-camera-status" class="ai-status">📹 Starting camera...</div>
+                        <div id="ai-camera-confidence" class="confidence-display hidden">
+                            <span id="ai-camera-label">–</span>
+                            <div class="confidence-bar-track">
+                                <div class="confidence-bar-fill" id="ai-camera-bar"></div>
+                            </div>
+                            <span id="ai-camera-pct">0%</span>
+                        </div>
+                        <!-- Capture & send to Gemini button -->
+                        <button class="btn btn--primary ai-capture-btn" id="ai-capture-btn" style="display:none">
+                            📸 Capture &amp; Analyze with Gemini
+                        </button>
+                    </div>
+                    <!-- No-camera tip -->
+                    <div id="ai-no-camera-tip" class="ai-no-camera-tip hidden">
+                        <div class="ai-no-camera-icon">📱</div>
+                        <div class="ai-no-camera-title">No camera found on this device</div>
+                        <div class="ai-no-camera-steps">
+                            <b>Quick Fix — Use your phone as webcam:</b><br>
+                            1. Install <b>DroidCam</b> app on your Android phone (Play Store — free)<br>
+                            2. Install <b>DroidCam Windows Client</b> on this PC (<a href="https://www.dev47apps.com" target="_blank" style="color:#7c3aed">dev47apps.com</a>)<br>
+                            3. Connect phone via USB → Start DroidCam<br>
+                            4. Reopen this tab and click "Live Camera" again ✅
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action buttons (shared — shown after any detection) -->
+                <div id="ai-hazard-prompt" class="ai-hazard-prompt hidden">
+                    <div class="prompt-icon">⚠️</div>
+                    <div class="prompt-content">
+                        <div class="prompt-title">Hazard Confirmed by AI!</div>
+                        <div class="prompt-detail" id="prompt-detail-text">AI has analyzed and classified the hazard.</div>
+                    </div>
+                    <div class="prompt-actions">
+                        <button class="btn btn--primary" id="ai-report-yes">✅ Report This Hazard</button>
+                        <button class="btn btn--outline" id="ai-report-no">↩ Scan Another</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Notification Panel -->
+    <div id="notification-panel" class="notification-panel hidden">
+        <div class="notification-header">
+            <h3>🔔 Notifications</h3>
+            <button class="btn btn--outline btn--sm" id="mark-all-read">Mark All Read</button>
+        </div>
+        <div class="notification-list" id="notification-list">
+            <!-- Notifications will be populated here -->
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">Processing...</div>
+            <div class="loading-subtext" id="loading-subtext">Please wait...</div>
+        </div>
+    </div>
+
+    <script src="mapp.js"></script>
+    <script src="app.js"></script>
+    <script src="i18n.js"></script>
+    <script src="unprecedented_engine.js"></script>
+    <script src="pressure_engine.js"></script>
+    <script src="priority_engine.js"></script>
+    <script src="rti_engine.js"></script>
+    <script src="unique_features.js"></script>
+    <script src="notifications_translation.js"></script>
+    <script src="civic_trust.js"></script>
+    <script src="profile.js"></script>
+    <script src="hackathon_polish.js"></script>
+</body>
+</html>

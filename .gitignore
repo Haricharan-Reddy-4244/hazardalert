@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment — NEVER commit these
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+
+# Test outputs
+e2e_out.txt
+e2e_out.log
+c:/tmp/
+
+# Test scripts (keep repo clean)
+backend/test_ai_accuracy.js
+backend/live_demo_socketio.js
+backend/complete_verification.js
+backend/e2e_verify.js
+backend/full_journey_test.js
+backend/verify_notifications.js
+test_hazard.js
+
+# Lock files (optional — remove if you want reproducible builds)
+package-lock.json

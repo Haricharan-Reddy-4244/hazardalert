@@ -1,0 +1,37 @@
+{
+  "name": "hazardalert-backend",
+  "version": "1.0.0",
+  "description": "HazardAlert — AI-powered civic accountability engine backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node run_migration.js",
+    "seed": "node seed_demo.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["hazard", "civic", "reporting", "road-safety"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.6",
+    "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "mysql2": "^3.16.0",
+    "node-cron": "^4.2.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11",
+    "socket.io-client": "^4.8.3"
+  }
+}
