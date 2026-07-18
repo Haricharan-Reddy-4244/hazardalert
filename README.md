@@ -54,9 +54,33 @@ Indian cities face **thousands of unreported road hazards** — potholes, open m
 ## 📸 Screenshots
 
 <p align="center">
-  <strong>Interactive Live Hazard Map & Dashboard</strong>
+  <strong>1. Interactive Live Hazard Map Dashboard</strong>
   <br/>
   <img src="docs/screenshot_1_map.png" alt="Live Hazard Map Dashboard" width="100%"/>
+</p>
+
+<br/>
+
+<p align="center">
+  <strong>2. Real-Time Proximity Alerts & Verification Feed</strong>
+  <br/>
+  <img src="docs/screenshot_4_dashboard.png" alt="Real-Time Feed Dashboard" width="100%"/>
+</p>
+
+<br/>
+
+<p align="center">
+  <strong>3. Ward-Wise Government Shame Board</strong>
+  <br/>
+  <img src="docs/screenshot_2_shameboard.png" alt="Shame Board" width="100%"/>
+</p>
+
+<br/>
+
+<p align="center">
+  <strong>4. AI-Weighted Priority Queue Engine</strong>
+  <br/>
+  <img src="docs/screenshot_3_priority.png" alt="Priority Queue" width="100%"/>
 </p>
 
 ---
