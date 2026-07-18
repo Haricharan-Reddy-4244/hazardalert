@@ -181,18 +181,18 @@ BE STRICT. If you are not at least 60% confident this is a REAL road or civic ha
 function _geminiFallback(descriptionText) {
   const d = descriptionText.toLowerCase();
   const types = [
+    { kw: ['accident','crash','collision','vehicle hit'],        type: 'Accident',            sev: 'critical', action: 'Alert 100 & 108, clear accident site and restore traffic flow' },
+    { kw: ['manhole','drain','sewer','gutter'],                  type: 'Open Manhole',        sev: 'critical', action: 'Install proper-sized manhole cover immediately — life-threatening risk' },
+    { kw: ['cave-in','cave in','sinkhole','sink hole','collapse'],type: 'Road Cave-in',        sev: 'critical', action: 'Barricade area immediately, assess underground utility damage, reinforce sub-base' },
+    { kw: ['construction hazard','excavation','pipe work','utility work','dug up'], type: 'Construction Hazard', sev: 'medium', action: 'Ensure proper barricading and lighting for road construction work zone' },
     { kw: ['pothole','pot hole','crater','pit','hole in road'],  type: 'Pothole',            sev: 'high',     action: 'Fill pothole with hot-mix asphalt, compact properly and paint road marking' },
-    { kw: ['manhole','drain','sewer','cover','gutter'],          type: 'Open Manhole',        sev: 'critical', action: 'Install proper-sized manhole cover immediately — life-threatening risk' },
-    { kw: ['cave','caved','sink','sinkhole','collapse'],         type: 'Road Cave-in',        sev: 'critical', action: 'Barricade area immediately, assess underground utility damage, reinforce sub-base' },
-    { kw: ['flood','waterlog','water log','inundated','water'],  type: 'Waterlogging',        sev: 'high',     action: 'Clear blocked storm drains and pump standing water off carriageway' },
-    { kw: ['tree','branch','fallen','uprooted','trunk'],         type: 'Fallen Tree',         sev: 'high',     action: 'Deploy tree-removal crew to clear debris, inspect for further instability' },
-    { kw: ['accident','crash','collision','vehicle','hit'],      type: 'Accident',            sev: 'critical', action: 'Alert 100 & 108, clear accident site and restore traffic flow' },
-    { kw: ['debris','garbage','rubble','construction','waste'],  type: 'Debris',              sev: 'medium',   action: 'Deploy sanitation crew to clear debris and restore safe passage' },
-    { kw: ['broken','crack','damaged','surface','tear','chip'],  type: 'Broken Road',         sev: 'medium',   action: 'Patch cracked surface with asphalt compound and mark damaged section' },
-    { kw: ['sign','board','signal','traffic light','indicator'], type: 'Damaged Signage',     sev: 'low',      action: 'Repair or replace damaged road signage for driver safety' },
-    { kw: ['speed','hump','bump','divider'],                     type: 'Road Feature',        sev: 'low',      action: 'Add proper visibility paint and warning signs for road features' },
-    { kw: ['construction','dug','excavation','pipe','utility'],  type: 'Construction Hazard', sev: 'medium',   action: 'Ensure proper barricading and lighting for road construction work zone' },
-    { kw: ['stall','stalled','broken down','vehicle','car'],     type: 'Stalled Vehicle',     sev: 'medium',   action: 'Clear stalled vehicle from road using tow truck, restore traffic flow' },
+    { kw: ['flood','waterlog','water log','inundated'],          type: 'Waterlogging',        sev: 'high',     action: 'Clear blocked storm drains and pump standing water off carriageway' },
+    { kw: ['tree','branch','uprooted','trunk'],                  type: 'Fallen Tree',         sev: 'high',     action: 'Deploy tree-removal crew to clear debris, inspect for further instability' },
+    { kw: ['debris','garbage','rubble','waste'],                 type: 'Debris',              sev: 'medium',   action: 'Deploy sanitation crew to clear debris and restore safe passage' },
+    { kw: ['broken road','cracks','damaged road','surface tear','chipped road'], type: 'Broken Road', sev: 'medium', action: 'Patch cracked surface with asphalt compound and mark damaged section' },
+    { kw: ['sign','board','signal','traffic light','indicator','signage'], type: 'Damaged Signage', sev: 'low',      action: 'Repair or replace damaged road signage for driver safety' },
+    { kw: ['speed hump','speed bump','divider'],                 type: 'Road Feature',        sev: 'low',      action: 'Add proper visibility paint and warning signs for road features' },
+    { kw: ['stall','stalled','broken down car','broken down vehicle'], type: 'Stalled Vehicle', sev: 'medium',   action: 'Clear stalled vehicle from road using tow truck, restore traffic flow' },
   ];
   const match = types.find(t => t.kw.some(k => d.includes(k))) || {
     type: 'Road Damage', sev: 'medium',
