@@ -132,49 +132,57 @@ Indian cities face **thousands of unreported road hazards** — potholes, open m
 
 ## 🏗️ Tech Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        FRONTEND                              │
-│  HTML5 + Vanilla JS + CSS3 (Glassmorphism Dark Theme)       │
-│  Leaflet.js (Maps) • Chart.js • Socket.io Client • PWA     │
-└────────────────────────┬─────────────────────────────────────┘
-                         │ REST API + WebSocket
-┌────────────────────────▼─────────────────────────────────────┐
-│                     BACKEND (Node.js)                        │
-│  Express 5 • Socket.io Server • Rate Limiting • CORS        │
-│                                                              │
-│  ┌─────────────┐ ┌──────────────┐ ┌────────────────────┐   │
-│  │ hazards.js  │ │intelligence.js│ │    auth.js         │   │
-│  │ CRUD+Voting │ │ Gemini AI    │ │ BCrypt Auth        │   │
-│  │ Trust Score │ │ Weather API  │ │ Session Mgmt       │   │
-│  └──────┬──────┘ └──────┬───────┘ └────────────────────┘   │
-│         │               │                                    │
-│  ┌──────▼───────────────▼────────────────────────────────┐  │
-│  │              External APIs                             │  │
-│  │  Google Gemini 2.0 Flash  •  OpenWeatherMap API       │  │
-│  └───────────────────────────────────────────────────────┘  │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-┌────────────────────────▼─────────────────────────────────────┐
-│                    DATABASE (MySQL 8)                         │
-│  users • hazards • verifications • rti_applications          │
-│  escalation_history • civic_points • notifications           │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Frontend [FRONTEND]
+        A["HTML5 / Vanilla JS / CSS3 (Glassmorphism)<br/>Leaflet.js Maps • Chart.js • Socket.io Client • PWA"]
+    end
+
+    subgraph Backend [BACKEND - Node.js / Express 5]
+        B1["hazards.js<br/>CRUD & Voting<br/>Trust Score Engine"]
+        B2["intelligence.js<br/>Gemini Vision AI<br/>Weather & Hotspots"]
+        B3["auth.js & users.js<br/>BCrypt Auth<br/>Civic Rep Leaderboard"]
+        
+        B1 & B2 & B3 --> Ext["External APIs<br/>Google Gemini 2.0 Flash<br/>OpenWeatherMap API"]
+    end
+
+    subgraph Database [DATABASE - MySQL 8]
+        DB["Tables:<br/>users • hazards • verifications • rti_applications<br/>escalation_history • civic_points • notifications"]
+    end
+
+    A -- "REST API (JSON) & WebSocket" --> Backend
+    Backend --> DB
+    
+    style Frontend fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#fff
+    style Backend fill:#111827,stroke:#6366f1,stroke-width:2px,color:#fff
+    style Database fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Ext fill:#312e81,stroke:#a855f7,stroke-width:1px,color:#fff
 ```
 
 ### Socket.io Grid Zone Architecture
 
+```mermaid
+flowchart TD
+    subgraph Grid_3x3 ["Socket.io 3x3 Grid Rooms (Coverage: ~1.1km × 1.1km per cell)"]
+        NW["Room: 1746_7837<br/>(North-West)"] --- N["Room: 1746_7838<br/>(North)"] --- NE["Room: 1746_7839<br/>(North-East)"]
+        W["Room: 1745_7837<br/>(West)"] --- Center["Room: 1745_7838<br/>(USER 📍 Center Room)"] --- E["Room: 1745_7839<br/>(East)"]
+        SW["Room: 1744_7837<br/>(South-West)"] --- S["Room: 1744_7838<br/>(South)"] --- SE["Room: 1744_7839<br/>(South-East)"]
+    end
+    
+    style Center fill:#4c1d95,stroke:#a855f7,stroke-width:3px,color:#fff
+    style NW fill:#1f2937,stroke:#374151,color:#fff
+    style N fill:#1f2937,stroke:#374151,color:#fff
+    style NE fill:#1f2937,stroke:#374151,color:#fff
+    style W fill:#1f2937,stroke:#374151,color:#fff
+    style E fill:#1f2937,stroke:#374151,color:#fff
+    style SW fill:#1f2937,stroke:#374151,color:#fff
+    style S fill:#1f2937,stroke:#374151,color:#fff
+    style SE fill:#1f2937,stroke:#374151,color:#fff
 ```
-         78.37    78.38    78.39
-        ┌────────┬────────┬────────┐
- 17.46  │  NW    │   N    │  NE    │
-        ├────────┼────────┼────────┤
- 17.45  │   W    │ USER📍 │   E    │  ← User at (17.449, 78.380)
-        ├────────┼────────┼────────┤    joins ALL 9 rooms
- 17.44  │  SW    │   S    │  SE    │
-        └────────┴────────┴────────┘
-        Each cell = ~1.1km × 1.1km
-```
+
+Each cell represents approximately `1.1km × 1.1km` geographical area. Upon connection, the user joins 9 neighbouring rooms to guarantee complete proximity safety warnings.
+
+---
 
 ---
 
