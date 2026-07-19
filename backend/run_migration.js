@@ -8,10 +8,54 @@ async function migrate() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 3306
+    port: process.env.DB_PORT || 3306,
+    ssl: parseInt(process.env.DB_PORT) === 4000 ? { rejectUnauthorized: false } : undefined
   });
 
   console.log('✅ Connected to database:', process.env.DB_NAME);
+
+  // 0. Create baseline users & hazards tables if they don't exist
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      email VARCHAR(100) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      phone VARCHAR(15) DEFAULT NULL,
+      role ENUM('citizen','official','admin') DEFAULT 'citizen',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      civic_points INT DEFAULT 0,
+      trust_tier VARCHAR(20) DEFAULT 'newcomer',
+      bio TEXT DEFAULT NULL,
+      avatar_color VARCHAR(10) DEFAULT NULL,
+      points INT DEFAULT 0,
+      INDEX idx_civic_points (civic_points)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  console.log('✅ users table ready');
+
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS hazards (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) DEFAULT NULL,
+      user_id INT NOT NULL,
+      hazard_type VARCHAR(50) DEFAULT NULL,
+      severity ENUM('low','medium','high','critical') DEFAULT 'medium',
+      latitude DECIMAL(10,8) DEFAULT NULL,
+      longitude DECIMAL(11,8) DEFAULT NULL,
+      description TEXT DEFAULT NULL,
+      image_url VARCHAR(255) DEFAULT NULL,
+      status ENUM('pending','verified','resolved','disputed','false_report') NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      address VARCHAR(500) DEFAULT NULL,
+      escalation_level TINYINT DEFAULT 0,
+      INDEX idx_status_created (status, created_at),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  console.log('✅ hazards table ready');
 
   // 1. Add title column to hazards if not exists
   const [cols] = await conn.query(`
