@@ -39,3 +39,6 @@ test_hazard.js
 
 # Lock files (optional — remove if you want reproducible builds)
 package-lock.json
+
+# Study guides / private notes
+docs/INTERVIEW_GUIDE.md
